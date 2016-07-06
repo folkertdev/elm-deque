@@ -1,0 +1,142 @@
+[
+  {
+    "name": "Deque",
+    "comment": " A Deque (double-ended queue) in Elm.\n\nA deque is a data type for which elements can be efficiently added or removed from either the front or the back.\n\nInternally, this is a head-tail linked list, modelled after [deque in Haskell](https://hackage.haskell.org/package/deque-0.1.12/docs/Data-Dequeue.html) which\nin turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.\nThis means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).\n\nThe deque rebalances (moves elements from the front to the rear or vice versa) when either one\nis 4 times as large as the other. This is a costly operation and therefore used as little as possible.\n\n\n#Type and Constructors\n@docs Deque\n\n#Build\n@docs empty, singleton, pushFront, pushBack\n\n#Query\n@docs isEmpty, member, first, last, popFront, popBack, takeFront, takeBack\n\n#Transform\n@docs map, filter, foldl, foldr, partition\n\n#Lists\n@docs fromList, toList\n\n#Abstract Nonsense\n\n*These terms and functions come from category theory and the programming language Haskell. In elm, they are of little importance to novices.*\n\nPrimitives to use a `Deque` as an applicative and a monad,\nrespecting the [applicative](https://hackage.haskell.org/package/base-4.9.0.0/docs/Control-Applicative.html) and [monad](https://wiki.haskell.org/Monad_laws) laws.\nInstances are based on (and as such, identical to) the standard implementations for list.\n\n@docs map2, andMap, (<*>), andThen, join\n\n",
+    "aliases": [],
+    "types": [
+      {
+        "name": "Deque",
+        "comment": " The deque datatype\n\nDeque equality with `(==)` is unreliable (equivalent deques can have a different distribution of elements between the back\nand the front) and should not be used.\n\nInternally deque is modelled as:\n\n    type Deque a\n        = Deque Int (List a) Int (List a)\n",
+        "args": [
+          "a"
+        ],
+        "cases": []
+      }
+    ],
+    "values": [
+      {
+        "name": "<*>",
+        "comment": " Infix version of andMap: left associative with precedence level 4.\n",
+        "type": "Deque.Deque (a -> b) -> Deque.Deque a -> Deque.Deque b",
+        "associativity": "left",
+        "precedence": 4
+      },
+      {
+        "name": "andMap",
+        "comment": " Allows for building up a deque from multiple deques\nEvery function in the first deque is mapped to all elements of the second one.\nThe result is then concatenated.\n\n    fromList [ abs, (\\x -> x + 2) ] `andMap` fromList [ -2, 4 ]\n        == fromList [ 2, 4, 0, 6 ]\n",
+        "type": "Deque.Deque (a -> b) -> Deque.Deque a -> Deque.Deque b"
+      },
+      {
+        "name": "andThen",
+        "comment": " Map a given function onto a deque and flatten the resulting deque.\nWorks similar to concatMap on lists.\n",
+        "type": "Deque.Deque a -> (a -> Deque.Deque b) -> Deque.Deque b"
+      },
+      {
+        "name": "empty",
+        "comment": " Create an empty deque.\n",
+        "type": "Deque.Deque a"
+      },
+      {
+        "name": "filter",
+        "comment": " Keep an element when it satisfies a predicate.\n",
+        "type": "(a -> Bool) -> Deque.Deque a -> Deque.Deque a"
+      },
+      {
+        "name": "first",
+        "comment": " Extract the first element of a deque\n",
+        "type": "Deque.Deque a -> Maybe.Maybe a"
+      },
+      {
+        "name": "foldl",
+        "comment": " Fold over the deque from left to right (highest priority to lowest priority)\n",
+        "type": "(a -> b -> b) -> b -> Deque.Deque a -> b"
+      },
+      {
+        "name": "foldr",
+        "comment": " Fold over the deque from right to left (lowest priority to highest priority)\n",
+        "type": "(a -> b -> b) -> b -> Deque.Deque a -> b"
+      },
+      {
+        "name": "fromList",
+        "comment": " Create a deque from a list.\n",
+        "type": "List a -> Deque.Deque a"
+      },
+      {
+        "name": "isEmpty",
+        "comment": " Determine if a deque is empty.\n",
+        "type": "Deque.Deque a -> Bool"
+      },
+      {
+        "name": "join",
+        "comment": " Deque equivalent of List.concat.\n",
+        "type": "Deque.Deque (Deque.Deque a) -> Deque.Deque a"
+      },
+      {
+        "name": "last",
+        "comment": " Extract the last element of a deque.\n",
+        "type": "Deque.Deque a -> Maybe.Maybe a"
+      },
+      {
+        "name": "map",
+        "comment": " Apply a function to all elements in a deque.\n",
+        "type": "(a -> b) -> Deque.Deque a -> Deque.Deque b"
+      },
+      {
+        "name": "map2",
+        "comment": " Apply a function of two arguments to the elements of two deques. The\nresult has the length of the smallest deque (just like lists).\n",
+        "type": "(a -> b -> c) -> Deque.Deque a -> Deque.Deque b -> Deque.Deque c"
+      },
+      {
+        "name": "member",
+        "comment": " Figure out whether a deque contains a value.\n",
+        "type": "a -> Deque.Deque a -> Bool"
+      },
+      {
+        "name": "partition",
+        "comment": " Partition a deque according to a predicate. The first deque contains\nall elements that satisfy the predicate, and the second contains the rest.\n",
+        "type": "(a -> Bool) -> Deque.Deque a -> ( Deque.Deque a, Deque.Deque a )"
+      },
+      {
+        "name": "popBack",
+        "comment": " Just the final element and the new deque if there are elements in the deque, Nothing otherwise.\n",
+        "type": "Deque.Deque a -> ( Maybe.Maybe a, Deque.Deque a )"
+      },
+      {
+        "name": "popFront",
+        "comment": " Just the first element and the new deque if there are elements in the deque, Nothing otherwise.\n",
+        "type": "Deque.Deque a -> ( Maybe.Maybe a, Deque.Deque a )"
+      },
+      {
+        "name": "pushBack",
+        "comment": " Add an element to the back of the deque.\n",
+        "type": "a -> Deque.Deque a -> Deque.Deque a"
+      },
+      {
+        "name": "pushFront",
+        "comment": " Add an element to the front of the deque.\n",
+        "type": "a -> Deque.Deque a -> Deque.Deque a"
+      },
+      {
+        "name": "singleton",
+        "comment": " Create a deque with one element.\n",
+        "type": "a -> Deque.Deque a"
+      },
+      {
+        "name": "takeBack",
+        "comment": " Take the last `n` members of a deque.\n",
+        "type": "Int -> Deque.Deque a -> List a"
+      },
+      {
+        "name": "takeFront",
+        "comment": " Take the first `n` members of a deque.\n",
+        "type": "Int -> Deque.Deque a -> List a"
+      },
+      {
+        "name": "toList",
+        "comment": " Convert a deque to a list.\n",
+        "type": "Deque.Deque a -> List a"
+      }
+    ],
+    "generated-with-elm-version": "0.17.0"
+  }
+]
