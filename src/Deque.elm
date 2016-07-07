@@ -3,9 +3,11 @@ module Deque
         ( Deque
         , empty
         , singleton
-        , setMaxSize
         , pushFront
         , pushBack
+          --
+        , getMaxSize
+        , setMaxSize
           --
         , isEmpty
         , member
@@ -30,28 +32,39 @@ module Deque
 
 A deque is a data type for which elements can be efficiently added or removed from either the front or the back.
 
-Internally, this is a head-tail linked list, modelled after [deque in Haskell](https://hackage.haskell.org/package/deque-0.1.12/docs/Data-Dequeue.html) which
+Internally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/deque-0.1.12/docs/Data-Dequeue.html) which
 in turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.
 This means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).
 
 The deque rebalances (moves elements from the front to the rear or vice versa) when either one
 is 4 times as large as the other. This is a costly operation and therefore used as little as possible.
 
+It is possible to set a maximum number of elements for the deque. The default is an unlimited
+size. When an item is pushed onto a full deque, an item is popped (and discarded) at the other end.
+
 
 #Type and Constructors
 @docs Deque
 
 #Build
-@docs empty, singleton, setMaxSize, pushFront, pushBack
+@docs empty, singleton, pushFront, pushBack
+
+#Lists
+@docs fromList, toList
+
+#Bound
+@docs getMaxSize, setMaxSize
 
 #Query
 @docs isEmpty, member, first, last, popFront, popBack, takeFront, takeBack
 
 #Transform
+
+Simple transform functions. To use more complex functions, like `map2` or `concat`, just
+convert the deque to a list, apply the operation and convert back.
+
 @docs map, filter, foldl, foldr, partition
 
-#Lists
-@docs fromList, toList
 
 -}
 
@@ -67,15 +80,28 @@ and the front) and should not be used.
 
 -}
 type Deque a
-    = Deque
-        { sizeF : Int
-        , front : List a
-        , sizeR : Int
-        , rear : List a
-        , maxSize : Maybe Int
-        }
+    = Deque (Internal a)
 
 
+type alias Internal a =
+    { sizeF : Int
+    , front : List a
+    , sizeR : Int
+    , rear : List a
+    , maxSize : Maybe Int
+    }
+
+
+
+{- DECLARE FOCI
+
+   The focus library is surprisingly useful when a record is wrapped in a type. The
+   normal getters (.attributeName) won't work, but focus allows you to
+   to define them quite succinctly (and you get setters).
+-}
+
+
+internalFocus : Focus.Focus (Deque a) (Internal a)
 internalFocus =
     let
         getter (Deque internal) =
@@ -132,6 +158,10 @@ maxSize =
         internalFocus => (Focus.create .maxSize setter)
 
 
+
+-- BUILD
+
+
 {-| Create an empty deque.
 -}
 empty : Deque a
@@ -157,22 +187,38 @@ a maxSize of Nothing means the deque's size is unbound,
 Just a value bounds the deque's size at that value.
 
 If the deque is larger than the bound, items are dropped from the back.
+
+    Deque.fromList [0..9]
+        |> setMaxSize (Just 5)
+        -- toList would give [ 0, 1, 2, 3, 4 ]
+        |> pushFront 42
+        -- toList would give [ 42, 0, 1, 2, 3 ]
+        |> pushBack -1
+        -- toList would give [ 0, 1, 2, 3, -1 ]
+        |> setMaxSize Nothing
+        |> pushFront 73
+        -- toList would give [ 73, 0, 1, 2, 3 -1 ]
+
 -}
 setMaxSize : Maybe Int -> Deque a -> Deque a
 setMaxSize mbound deque =
-    let
-        newDeque =
+    case mbound of
+        Nothing ->
             set maxSize mbound deque
 
-        limit n =
-            fromList << takeFront n
-    in
-        case mbound of
-            Nothing ->
-                newDeque
+        Just bound ->
+            -- fromList rebalances
+            set maxSize mbound deque
+                |> takeFront bound
+                |> fromList
 
-            Just bound ->
-                limit bound newDeque
+
+{-| Get the maximum number of elements this deque can hold. A value of Nothing
+means the deque can hold an unlimited number of items (which is the default).
+-}
+getMaxSize : Deque a -> Maybe Int
+getMaxSize =
+    get maxSize
 
 
 {-| Add an element to the front of the deque.
