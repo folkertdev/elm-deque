@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Dequeue exposing (..)
+import Deque exposing (..)
 import Check exposing (Claim, Evidence, suite, claim, that, is, for, quickCheck)
 import Check.Producer as Producer exposing (list, int)
 import Check.Test
@@ -15,12 +15,12 @@ dequeue =
 functor : Claim
 functor =
     suite "Check the functor laws"
-        [ claim "Dequeue.map identity == identity"
-            `that` (Dequeue.map identity)
+        [ claim "Deque.map identity == identity"
+            `that` (Deque.map identity)
             `is` identity
             `for` dequeue int
-        , claim "Dequeue.filter (always True) == identity"
-            `that` (Dequeue.filter (\_ -> True))
+        , claim "Deque.filter (always True) == identity"
+            `that` (Deque.filter (\_ -> True))
             `is` identity
             `for` dequeue int
         ]
@@ -29,11 +29,11 @@ functor =
 monad : Claim
 monad =
     let
-        -- f : a -> Dequeue b
+        -- f : a -> Deque b
         f a =
             pushFront a <| fromList [ 42 ]
 
-        -- f : a -> Dequeue b
+        -- f : a -> Deque b
         g a =
             pushBack a <| fromList [ -42 ]
     in
@@ -115,11 +115,11 @@ construction : Claim
 construction =
     suite "Construction"
         [ claim "push << pop == identity; front"
-            `that` (Dequeue.pushFront 1 >> Dequeue.popFront >> Maybe.map (snd >> toList))
+            `that` (Deque.pushFront 1 >> Deque.popFront >> Maybe.map (snd >> toList))
             `is` (Just << toList)
             `for` dequeue int
         , claim "push << pop == identity; back"
-            `that` (Dequeue.pushBack 1 >> Dequeue.popBack >> Maybe.map (snd >> toList))
+            `that` (Deque.pushBack 1 >> Deque.popBack >> Maybe.map (snd >> toList))
             `is` (Just << toList)
             `for` dequeue int
         , claim "fromList << pushLeft v << toList == v ::"
@@ -135,7 +135,7 @@ construction =
             `is` List.tail
             `for` list int
         , claim "fromList >> popBack >> toList == tail "
-            `that` (fromList >> popBack >> Maybe.map (snd >> toList))
+            `that` (fromList >> popBack >> snd >> toList)
             `is` (\l -> init l)
             `for` list int
         ]
@@ -169,7 +169,7 @@ lists =
 
 claims : Claim
 claims =
-    suite "Claims about Dequeue"
+    suite "Claims about Deque"
         [ functor
         , applicative
         , monad
