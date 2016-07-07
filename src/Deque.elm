@@ -22,12 +22,6 @@ module Deque
         , foldr
         , partition
           --
-        , map2
-        , andMap
-        , (<*>)
-        , andThen
-        , join
-          --
         , fromList
         , toList
         )
@@ -58,18 +52,6 @@ is 4 times as large as the other. This is a costly operation and therefore used 
 
 #Lists
 @docs fromList, toList
-
-#Abstract Nonsense
-
-*These terms and functions come from category theory and the programming language Haskell. In elm, they are of generally of little importance, but may come
-in handy.*
-
-Primitives to use a `Deque` as an applicative and a monad,
-respecting the [applicative](https://hackage.haskell.org/package/base-4.9.0.0/docs/Control-Applicative.html) and [monad](https://wiki.haskell.org/Monad_laws) laws.
-Instances are based on (and as such, identical to) the standard implementations for list
-and are verified with property-based testing (see [the tests](https://github.com/folkertdev/elm-deque/tree/master/test/Test.elm)).
-
-@docs map2, andMap, (<*>), andThen, join
 
 -}
 
@@ -297,6 +279,7 @@ length (Deque deque) =
 
 
 {-| Apply a function to all elements in a deque.
+
 -}
 map : (a -> b) -> Deque a -> Deque b
 map f (Deque deque) =
@@ -305,64 +288,6 @@ map f (Deque deque) =
             | front = List.map f deque.front
             , rear = List.map f deque.rear
         }
-
-
-{-| Apply a function of two arguments to the elements of two deques. The
-result has the length of the smallest deque (just like lists).
--}
-map2 : (a -> b -> c) -> Deque a -> Deque b -> Deque c
-map2 f a b =
-    fromList <| List.map2 f (toList a) (toList b)
-
-
-{-| Allows for building up a deque from multiple deques
-Every function in the first deque is mapped to all elements of the second one.
-The result is then concatenated.
-
-    fromList [ abs, (\x -> x + 2) ] `andMap` fromList [ -2, 4 ]
-        == fromList [ 2, 4, 0, 6 ]
--}
-andMap : Deque (a -> b) -> Deque a -> Deque b
-andMap fs xs =
-    -- elm-format butchers this expression if it is not on one line
-    fs `andThen` \f -> xs `andThen` \x -> singleton (f x)
-
-
-{-| Infix version of andMap: left associative with precedence level 4.
--}
-(<*>) : Deque (a -> b) -> Deque a -> Deque b
-(<*>) =
-    andMap
-infixl 4 <*>
-
-
-(<$>) =
-    -- infix version of map/fmap. Only for internal use
-    map
-infixl 4 <$>
-
-
-{-| Deque equivalent of List.concat.
--}
-join : Deque (Deque a) -> Deque a
-join deque =
-    let
-        list =
-            map toList deque
-                |> toList
-                |> List.concat
-                |> fromList
-    in
-        list
-
-
-{-| Map a given function onto a deque and flatten the resulting deque.
-Works similar to concatMap on lists.
--}
-andThen : Deque a -> (a -> Deque b) -> Deque b
-andThen deque f =
-    map f deque
-        |> join
 
 
 {-| Keep an element when it satisfies a predicate.
