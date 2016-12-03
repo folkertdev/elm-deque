@@ -32,7 +32,7 @@ module Deque
 
 A deque is a data type for which elements can be efficiently added or removed from either the front or the back.
 
-Internally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/deque-0.1.12/docs/Data-Dequeue.html) which
+Internally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/dequeue-0.1.12/docs/Data-Dequeue.html) which
 in turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.
 This means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).
 
@@ -68,9 +68,7 @@ convert the deque to a list, apply the operation and convert back.
 
 -}
 
-import Debug
 import List
-import Focus exposing ((=>), get, set, update)
 
 
 {-| The deque datatype
@@ -92,70 +90,14 @@ type alias Internal a =
     }
 
 
-
-{- DECLARE FOCI
-
-   The focus library is surprisingly useful when a record is wrapped in a type. The
-   normal getters (.attributeName) won't work, but focus allows you to
-   to define them quite succinctly (and you get setters).
--}
+mapInternal : (Internal a -> Internal b) -> Deque a -> Deque b
+mapInternal f (Deque internal) =
+    Deque (f internal)
 
 
-internalFocus : Focus.Focus (Deque a) (Internal a)
-internalFocus =
-    let
-        getter (Deque internal) =
-            internal
-
-        setter f (Deque internal) =
-            Deque (f internal)
-    in
-        Focus.create getter setter
-
-
-sizeF : Focus.Focus (Deque a) Int
-sizeF =
-    let
-        setter f record =
-            { record | sizeF = f record.sizeF }
-    in
-        internalFocus => (Focus.create .sizeF setter)
-
-
-sizeR : Focus.Focus (Deque a) Int
-sizeR =
-    let
-        setter f record =
-            { record | sizeR = f record.sizeR }
-    in
-        internalFocus => (Focus.create .sizeR setter)
-
-
-front : Focus.Focus (Deque a) (List a)
-front =
-    let
-        setter f record =
-            { record | front = f record.front }
-    in
-        internalFocus => (Focus.create .front setter)
-
-
-rear : Focus.Focus (Deque a) (List a)
-rear =
-    let
-        setter f record =
-            { record | rear = f record.rear }
-    in
-        internalFocus => (Focus.create .rear setter)
-
-
-maxSize : Focus.Focus (Deque a) (Maybe Int)
-maxSize =
-    let
-        setter f record =
-            { record | maxSize = f record.maxSize }
-    in
-        internalFocus => (Focus.create .maxSize setter)
+unwrap : Deque a -> Internal a
+unwrap (Deque internal) =
+    internal
 
 
 
@@ -201,16 +143,13 @@ If the deque is larger than the bound, items are dropped from the back.
 
 -}
 setMaxSize : Maybe Int -> Deque a -> Deque a
-setMaxSize mbound deque =
+setMaxSize mbound =
     case mbound of
         Nothing ->
-            set maxSize mbound deque
+            mapInternal (\deque -> { deque | maxSize = mbound })
 
         Just bound ->
-            -- fromList rebalances
-            set maxSize mbound deque
-                |> takeFront bound
-                |> fromList
+            fromList << takeFront bound << mapInternal (\deque -> { deque | maxSize = mbound })
 
 
 {-| Get the maximum number of elements this deque can hold. A value of Nothing
@@ -218,23 +157,30 @@ means the deque can hold an unlimited number of items (which is the default).
 -}
 getMaxSize : Deque a -> Maybe Int
 getMaxSize =
-    get maxSize
+    .maxSize << unwrap
+
+
+reachedMaxSize : Deque a -> Bool
+reachedMaxSize (Deque { sizeF, sizeR, maxSize }) =
+    Just (sizeF + sizeR) == maxSize
 
 
 {-| Add an element to the front of the deque.
 -}
 pushFront : a -> Deque a -> Deque a
-pushFront elem deque =
+pushFront elem ((Deque { maxSize }) as deque) =
     let
-        newDeque =
-            if Just (length deque) == get maxSize deque then
-                snd (popBack deque)
+        (Deque newDeque) =
+            if reachedMaxSize deque then
+                Tuple.second (popBack deque)
             else
                 deque
     in
-        newDeque
-            |> update sizeF (\x -> x + 1)
-            |> update front (\fs -> elem :: fs)
+        { newDeque
+            | sizeF = newDeque.sizeF + 1
+            , front = elem :: newDeque.front
+        }
+            |> Deque
             |> rebalance
 
 
@@ -243,15 +189,17 @@ pushFront elem deque =
 pushBack : a -> Deque a -> Deque a
 pushBack elem deque =
     let
-        newDeque =
-            if Just (length deque) == get maxSize deque then
-                snd (popFront deque)
+        (Deque newDeque) =
+            if reachedMaxSize deque then
+                Tuple.second (popFront deque)
             else
                 deque
     in
-        newDeque
-            |> update sizeR (\v -> v + 1)
-            |> update rear (\rs -> elem :: rs)
+        { newDeque
+            | sizeR = newDeque.sizeR + 1
+            , rear = elem :: newDeque.rear
+        }
+            |> Deque
             |> rebalance
 
 
@@ -259,8 +207,8 @@ pushBack elem deque =
 If there are no elements, the empty deque is returned.
 -}
 popFront : Deque a -> ( Maybe a, Deque a )
-popFront deque =
-    case ( get front deque, get rear deque ) of
+popFront ((Deque { front, rear }) as deque) =
+    case ( front, rear ) of
         ( [], [] ) ->
             ( Nothing, empty )
 
@@ -272,9 +220,7 @@ popFront deque =
 
         ( f :: fs, _ ) ->
             ( Just f
-            , deque
-                |> update sizeF (\x -> x - 1)
-                |> set front fs
+            , mapInternal (\deque -> { deque | sizeF = deque.sizeF - 1, front = fs }) deque
                 |> rebalance
             )
 
@@ -283,8 +229,8 @@ popFront deque =
 If there are no elements, the empty deque is returned.
 -}
 popBack : Deque a -> ( Maybe a, Deque a )
-popBack deque =
-    case ( get front deque, get rear deque ) of
+popBack ((Deque { front, rear }) as deque) =
+    case ( front, rear ) of
         ( [], [] ) ->
             ( Nothing, empty )
 
@@ -296,9 +242,7 @@ popBack deque =
 
         ( _, r :: rs ) ->
             ( Just r
-            , deque
-                |> update sizeR (\x -> x - 1)
-                |> set rear rs
+            , mapInternal (\deque -> { deque | sizeR = deque.sizeR - 1, rear = rs }) deque
                 |> rebalance
             )
 
@@ -314,7 +258,7 @@ isEmpty deque =
 -}
 member : a -> Deque a -> Bool
 member elem (Deque deque) =
-    (List.member elem deque.front) || (List.member elem deque.rear)
+    List.member elem deque.front || List.member elem deque.rear
 
 
 {-| Determine the length of a list.
@@ -497,7 +441,9 @@ toList (Deque deque) =
 -}
 fromList : List a -> Deque a
 fromList list =
-    empty
-        |> set sizeF (List.length list)
-        |> set front list
-        |> rebalance
+    let
+        (Deque e) =
+            empty
+    in
+        Deque { e | sizeF = List.length list, front = list }
+            |> rebalance
