@@ -17,6 +17,7 @@ module Deque
         , popBack
         , takeFront
         , takeBack
+        , append
           --
         , map
         , filter
@@ -34,7 +35,7 @@ A deque is a data type for which elements can be efficiently added or removed fr
 
 Internally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/dequeue-0.1.12/docs/Data-Dequeue.html) which
 in turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.
-This means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).
+This means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(1)`).
 
 The deque rebalances (moves elements from the front to the rear or vice versa) when either one
 is 4 times as large as the other. This is a costly operation and therefore used as little as possible.
@@ -43,11 +44,11 @@ It is possible to set a maximum number of elements for the deque. The default is
 size. When an item is pushed onto a full deque, an item is popped (and discarded) at the other end.
 
 
-#Type and Constructors
+#Type
 @docs Deque
 
 #Build
-@docs empty, singleton, pushFront, pushBack
+@docs empty, singleton, pushFront, pushBack, append
 
 #Lists
 @docs fromList, toList
@@ -122,6 +123,26 @@ empty =
 singleton : a -> Deque a
 singleton elem =
     pushFront elem empty
+
+
+{-| Concatenate two deques into one.
+
+The `maxSize` is set to the sum of the two sizes; if either `maxSize` is Nothing, the result `maxSize` is Nothing.
+-}
+append : Deque a -> Deque a -> Deque a
+append ((Deque x) as p) ((Deque y) as q) =
+    if isEmpty p then
+        Deque { y | maxSize = Maybe.map2 (+) x.maxSize y.maxSize }
+    else if isEmpty q then
+        Deque { x | maxSize = Maybe.map2 (+) x.maxSize y.maxSize }
+    else
+        Deque
+            { sizeF = x.sizeF + x.sizeR
+            , front = x.front ++ List.reverse x.rear
+            , sizeR = y.sizeF + y.sizeR
+            , rear = List.reverse (y.front ++ List.reverse y.rear)
+            , maxSize = Maybe.map2 (+) x.maxSize y.maxSize
+            }
 
 
 {-| Sets a bound to the number of elements the deque can hold.

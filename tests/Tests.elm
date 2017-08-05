@@ -40,6 +40,10 @@ construction =
             \ints ->
                 (fromList >> pushBack 42 >> toList) ints
                     |> Expect.equal (ints ++ [ 42 ])
+        , fuzz (tuple ( deque int, deque int )) "toList (append a b) == (toList a) ++ (toList b)" <|
+            \( a, b ) ->
+                toList (Deque.append a b)
+                    |> Expect.equal (toList a ++ toList b)
         ]
 
 

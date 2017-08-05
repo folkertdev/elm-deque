@@ -1,7 +1,7 @@
 [
   {
     "name": "Deque",
-    "comment": " A Deque (double-ended queue) in Elm.\n\nA deque is a data type for which elements can be efficiently added or removed from either the front or the back.\n\nInternally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/deque-0.1.12/docs/Data-Dequeue.html) which\nin turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.\nThis means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).\n\nThe deque rebalances (moves elements from the front to the rear or vice versa) when either one\nis 4 times as large as the other. This is a costly operation and therefore used as little as possible.\n\nIt is possible to set a maximum number of elements for the deque. The default is an unlimited\nsize. When an item is pushed onto a full deque, an item is popped (and discarded) at the other end.\n\n\n#Type and Constructors\n@docs Deque\n\n#Build\n@docs empty, singleton, pushFront, pushBack\n\n#Lists\n@docs fromList, toList\n\n#Bound\n@docs getMaxSize, setMaxSize\n\n#Query\n@docs isEmpty, member, first, last, popFront, popBack, takeFront, takeBack\n\n#Transform\n\nSimple transform functions. To use more complex functions, like `map2` or `concat`, just\nconvert the deque to a list, apply the operation and convert back.\n\n@docs map, filter, foldl, foldr, partition\n\n\n",
+    "comment": " A Deque (double-ended queue) in Elm.\n\nA deque is a data type for which elements can be efficiently added or removed from either the front or the back.\n\nInternally, this is a head-tail linked list, modeled after this [deque in Haskell](https://hackage.haskell.org/package/dequeue-0.1.12/docs/Data-Dequeue.html) which\nin turn is based on Chris Okasaki's Purely Functional Data Structures. A head-tail linked list is based on two lists: one for the head and one for the tail.\nThis means that pop and push on either side are operations on the front portion of an elm list, which is very efficient (`O(n)`).\n\nThe deque rebalances (moves elements from the front to the rear or vice versa) when either one\nis 4 times as large as the other. This is a costly operation and therefore used as little as possible.\n\nIt is possible to set a maximum number of elements for the deque. The default is an unlimited\nsize. When an item is pushed onto a full deque, an item is popped (and discarded) at the other end.\n\n\n#Type and Constructors\n@docs Deque\n\n#Build\n@docs empty, singleton, pushFront, pushBack, append\n\n#Lists\n@docs fromList, toList\n\n#Bound\n@docs getMaxSize, setMaxSize\n\n#Query\n@docs isEmpty, member, first, last, popFront, popBack, takeFront, takeBack\n\n#Transform\n\nSimple transform functions. To use more complex functions, like `map2` or `concat`, just\nconvert the deque to a list, apply the operation and convert back.\n\n@docs map, filter, foldl, foldr, partition\n\n\n",
     "aliases": [],
     "types": [
       {
@@ -14,6 +14,11 @@
       }
     ],
     "values": [
+      {
+        "name": "append",
+        "comment": " Concatenate two deques into one.\n\nThe `maxSize` is set to the sum of the two sizes; if either `maxSize` is Nothing, the result `maxSize` is Nothing.\n",
+        "type": "Deque.Deque a -> Deque.Deque a -> Deque.Deque a"
+      },
       {
         "name": "empty",
         "comment": " Create an empty deque.\n",
@@ -120,6 +125,6 @@
         "type": "Deque.Deque a -> List a"
       }
     ],
-    "generated-with-elm-version": "0.17.0"
+    "generated-with-elm-version": "0.18.0"
   }
 ]
