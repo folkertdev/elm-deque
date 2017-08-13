@@ -3,22 +3,13 @@ module Tests exposing (..)
 import Test exposing (..)
 import Expect
 import Fuzz exposing (list, int, tuple, string)
-import String
 import Deque exposing (Deque, fromList, toList, pushFront, pushBack)
 import Tuple exposing (second)
 
 
+deque : Fuzz.Fuzzer a -> Fuzz.Fuzzer (Deque a)
 deque =
     Fuzz.map fromList << list
-
-
-listToMaybe l =
-    case l of
-        [] ->
-            Nothing
-
-        x :: xs ->
-            Just (x :: xs)
 
 
 construction : Test
@@ -41,9 +32,53 @@ construction =
                 (fromList >> pushBack 42 >> toList) ints
                     |> Expect.equal (ints ++ [ 42 ])
         , fuzz (tuple ( deque int, deque int )) "toList (append a b) == (toList a) ++ (toList b)" <|
-            \( a, b ) ->
-                toList (Deque.append a b)
-                    |> Expect.equal (toList a ++ toList b)
+            \( firstDeque, secondDeque ) ->
+                let
+                    given =
+                        firstDeque
+                            |> Deque.append secondDeque
+                            |> Deque.toList
+
+                    expected =
+                        (Deque.toList firstDeque)
+                            |> List.append (Deque.toList secondDeque)
+                in
+                    given
+                        |> Expect.equal expected
+        ]
+
+
+folds : Test
+folds =
+    describe "folds"
+        [ fuzz (deque string) "foldl f d == foldl f d << toList" <|
+            \strings ->
+                let
+                    given =
+                        strings
+                            |> Deque.foldl (++) ""
+
+                    expected =
+                        strings
+                            |> Deque.toList
+                            |> List.foldl (++) ""
+                in
+                    given
+                        |> Expect.equal expected
+        , fuzz (deque string) "foldr f d == foldr f d << toList" <|
+            \strings ->
+                let
+                    given =
+                        strings
+                            |> Deque.foldr (++) ""
+
+                    expected =
+                        strings
+                            |> Deque.toList
+                            |> List.foldr (++) ""
+                in
+                    given
+                        |> Expect.equal expected
         ]
 
 

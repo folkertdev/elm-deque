@@ -127,6 +127,18 @@ singleton elem =
 
 {-| Concatenate two deques into one.
 
+This function is written in pipeline style, so
+
+    firstDeque
+        |> Deque.append secondDeque
+        |> Deque.toList
+
+is the same as
+
+    (Deque.toList firstDeque)
+        |> List.append (Deque.toList secondDeque)
+
+
 The `maxSize` is set to the sum of the two sizes; if either `maxSize` is Nothing, the result `maxSize` is Nothing.
 -}
 append : Deque a -> Deque a -> Deque a
@@ -325,15 +337,17 @@ filter p (Deque deque) =
 {-| Fold over the deque from left to right (highest priority to lowest priority).
 -}
 foldl : (a -> b -> b) -> b -> Deque a -> b
-foldl f initial =
-    List.foldl f initial << toList
+foldl f initial (Deque deque) =
+    List.foldl f initial deque.front
+        |> (\initial_ -> List.foldr f initial_ deque.rear)
 
 
 {-| Fold over the deque from right to left (lowest priority to highest priority).
 -}
 foldr : (a -> b -> b) -> b -> Deque a -> b
-foldr f initial =
-    List.foldr f initial << toList
+foldr f initial (Deque deque) =
+    List.foldl f initial deque.rear
+        |> (\initial_ -> List.foldr f initial_ deque.front)
 
 
 {-| Partition a deque according to a predicate. The first deque contains
