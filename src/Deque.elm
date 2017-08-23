@@ -6,11 +6,9 @@ module Deque
         , pushFront
         , pushBack
           --
-        , getMaxSize
-        , setMaxSize
-          --
         , isEmpty
         , member
+        , length
         , first
         , last
         , popFront
@@ -24,6 +22,9 @@ module Deque
         , foldl
         , foldr
         , partition
+          --
+        , map2
+        , andMap
           --
         , fromList
         , toList
@@ -40,9 +41,7 @@ This means that pop and push on either side are operations on the front portion 
 The deque rebalances (moves elements from the front to the rear or vice versa) when either one
 is 4 times as large as the other. This is a costly operation and therefore used as little as possible.
 
-It is possible to set a maximum number of elements for the deque. The default is an unlimited
-size. When an item is pushed onto a full deque, an item is popped (and discarded) at the other end.
-
+For a deque with a limited size, see [BoundedDeque](#BoundedDeque).
 
 #Type
 @docs Deque
@@ -53,22 +52,19 @@ size. When an item is pushed onto a full deque, an item is popped (and discarded
 #Lists
 @docs fromList, toList
 
-#Bound
-@docs getMaxSize, setMaxSize
-
 #Query
-@docs isEmpty, member, first, last, popFront, popBack, takeFront, takeBack
+@docs isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
 
 #Transform
-
-Simple transform functions. To use more complex functions, like `map2` or `concat`, just
-convert the deque to a list, apply the operation and convert back.
-
 @docs map, filter, foldl, foldr, partition
+
+#Composition
+@docs map2, andMap
 
 
 -}
 
+import Internal exposing (Deque(..))
 import List
 
 
@@ -78,27 +74,18 @@ Deque equality with `(==)` is unreliable (equivalent deques can have a different
 and the front) and should not be used.
 
 -}
-type Deque a
-    = Deque (Internal a)
+type alias Deque a =
+    Internal.Deque a
 
 
-type alias Internal a =
-    { sizeF : Int
-    , front : List a
-    , sizeR : Int
-    , rear : List a
-    , maxSize : Maybe Int
-    }
+mapAbstract : (Internal.AbstractDeque {} a -> Internal.AbstractDeque {} b) -> Deque a -> Deque b
+mapAbstract f (Deque abstract) =
+    Deque (f abstract)
 
 
-mapInternal : (Internal a -> Internal b) -> Deque a -> Deque b
-mapInternal f (Deque internal) =
-    Deque (f internal)
-
-
-unwrap : Deque a -> Internal a
-unwrap (Deque internal) =
-    internal
+unwrap : Deque a -> Internal.AbstractDeque {} a
+unwrap (Deque boundedDeque) =
+    boundedDeque
 
 
 
@@ -109,13 +96,16 @@ unwrap (Deque internal) =
 -}
 empty : Deque a
 empty =
-    Deque
-        { sizeF = 0
-        , front = []
-        , sizeR = 0
-        , rear = []
-        , maxSize = Nothing
-        }
+    Deque emptyAbstract
+
+
+emptyAbstract : { front : List b, rear : List c, sizeF : number, sizeR : number1 }
+emptyAbstract =
+    { sizeF = 0
+    , front = []
+    , sizeR = 0
+    , rear = []
+    }
 
 
 {-| Create a deque with one element.
@@ -139,215 +129,132 @@ is the same as
         |> List.append (Deque.toList secondDeque)
 
 
-The `maxSize` is set to the sum of the two sizes; if either `maxSize` is Nothing, the result `maxSize` is Nothing.
 -}
 append : Deque a -> Deque a -> Deque a
 append ((Deque x) as p) ((Deque y) as q) =
     if isEmpty p then
-        Deque { y | maxSize = Maybe.map2 (+) x.maxSize y.maxSize }
+        q
     else if isEmpty q then
-        Deque { x | maxSize = Maybe.map2 (+) x.maxSize y.maxSize }
+        p
     else
         Deque
             { sizeF = x.sizeF + x.sizeR
             , front = x.front ++ List.reverse x.rear
             , sizeR = y.sizeF + y.sizeR
             , rear = List.reverse (y.front ++ List.reverse y.rear)
-            , maxSize = Maybe.map2 (+) x.maxSize y.maxSize
             }
-
-
-{-| Sets a bound to the number of elements the deque can hold.
-a maxSize of Nothing means the deque's size is unbound,
-Just a value bounds the deque's size at that value.
-
-If the deque is larger than the bound, items are dropped from the back.
-
-    Deque.fromList [0..9]
-        |> setMaxSize (Just 5)
-        -- toList would give [ 0, 1, 2, 3, 4 ]
-        |> pushFront 42
-        -- toList would give [ 42, 0, 1, 2, 3 ]
-        |> pushBack -1
-        -- toList would give [ 0, 1, 2, 3, -1 ]
-        |> setMaxSize Nothing
-        |> pushFront 73
-        -- toList would give [ 73, 0, 1, 2, 3 -1 ]
-
--}
-setMaxSize : Maybe Int -> Deque a -> Deque a
-setMaxSize mbound =
-    case mbound of
-        Nothing ->
-            mapInternal (\deque -> { deque | maxSize = mbound })
-
-        Just bound ->
-            fromList << takeFront bound << mapInternal (\deque -> { deque | maxSize = mbound })
-
-
-{-| Get the maximum number of elements this deque can hold. A value of Nothing
-means the deque can hold an unlimited number of items (which is the default).
--}
-getMaxSize : Deque a -> Maybe Int
-getMaxSize =
-    .maxSize << unwrap
-
-
-reachedMaxSize : Deque a -> Bool
-reachedMaxSize (Deque { sizeF, sizeR, maxSize }) =
-    Just (sizeF + sizeR) == maxSize
 
 
 {-| Add an element to the front of the deque.
 -}
 pushFront : a -> Deque a -> Deque a
-pushFront elem ((Deque { maxSize }) as deque) =
-    let
-        (Deque newDeque) =
-            if reachedMaxSize deque then
-                Tuple.second (popBack deque)
-            else
-                deque
-    in
-        { newDeque
-            | sizeF = newDeque.sizeF + 1
-            , front = elem :: newDeque.front
-        }
-            |> Deque
-            |> rebalance
+pushFront elem (Deque deque) =
+    { deque
+        | sizeF = deque.sizeF + 1
+        , front = elem :: deque.front
+    }
+        |> Deque
+        |> mapAbstract Internal.rebalance
 
 
 {-| Add an element to the back of the deque.
 -}
 pushBack : a -> Deque a -> Deque a
-pushBack elem deque =
-    let
-        (Deque newDeque) =
-            if reachedMaxSize deque then
-                Tuple.second (popFront deque)
-            else
-                deque
-    in
-        { newDeque
-            | sizeR = newDeque.sizeR + 1
-            , rear = elem :: newDeque.rear
-        }
-            |> Deque
-            |> rebalance
+pushBack elem (Deque deque) =
+    { deque
+        | sizeR = deque.sizeR + 1
+        , rear = elem :: deque.rear
+    }
+        |> Deque
+        |> mapAbstract Internal.rebalance
 
 
 {-| Gives Maybe the first element, and the deque without the first element.
 If there are no elements, the empty deque is returned.
 -}
 popFront : Deque a -> ( Maybe a, Deque a )
-popFront ((Deque { front, rear }) as deque) =
-    case ( front, rear ) of
-        ( [], [] ) ->
-            ( Nothing, empty )
-
-        ( [], [ x ] ) ->
-            ( Just x, empty )
-
-        ( [], _ ) ->
-            Debug.crash "Deque is too far unbalanced"
-
-        ( f :: fs, _ ) ->
-            ( Just f
-            , mapInternal (\deque -> { deque | sizeF = deque.sizeF - 1, front = fs }) deque
-                |> rebalance
-            )
+popFront =
+    Tuple.mapSecond Deque << Internal.popFront emptyAbstract << unwrap
 
 
 {-| Gives Maybe the last element, and the deque without the last element.
 If there are no elements, the empty deque is returned.
 -}
 popBack : Deque a -> ( Maybe a, Deque a )
-popBack ((Deque { front, rear }) as deque) =
-    case ( front, rear ) of
-        ( [], [] ) ->
-            ( Nothing, empty )
-
-        ( [ x ], [] ) ->
-            ( Just x, empty )
-
-        ( _, [] ) ->
-            Debug.crash "Deque is too far unbalanced"
-
-        ( _, r :: rs ) ->
-            ( Just r
-            , mapInternal (\deque -> { deque | sizeR = deque.sizeR - 1, rear = rs }) deque
-                |> rebalance
-            )
+popBack =
+    Tuple.mapSecond Deque << Internal.popBack emptyAbstract << unwrap
 
 
 {-| Determine if a deque is empty.
 -}
 isEmpty : Deque a -> Bool
-isEmpty deque =
-    length deque == 0
+isEmpty =
+    Internal.isEmpty << unwrap
 
 
 {-| Figure out whether a deque contains a value.
 -}
 member : a -> Deque a -> Bool
-member elem (Deque deque) =
-    List.member elem deque.front || List.member elem deque.rear
+member elem =
+    Internal.member elem << unwrap
 
 
 {-| Determine the length of a list.
 -}
 length : Deque a -> Int
-length (Deque deque) =
-    deque.sizeF + deque.sizeR
+length =
+    Internal.length << unwrap
 
 
 {-| Apply a function to all elements in a deque.
 
 -}
 map : (a -> b) -> Deque a -> Deque b
-map f (Deque deque) =
-    Deque
-        { deque
-            | front = List.map f deque.front
-            , rear = List.map f deque.rear
-        }
+map f =
+    mapAbstract (Internal.map f)
+
+
+{-| Like List.map2; apply a function pairwise to two deques.
+-}
+map2 : (a -> b -> c) -> Deque a -> Deque b -> Deque c
+map2 f a b =
+    List.map2 f (toList a) (toList b)
+        |> fromList
+
+
+{-| Handy function for constructing maps.
+
+to extend to map3 and beyond:
+
+    map3 f a b c =
+        map f a
+            |> andMap b
+            |> andMap c
+-}
+andMap : Deque a -> Deque (a -> b) -> Deque b
+andMap =
+    map2 (|>)
 
 
 {-| Keep an element when it satisfies a predicate.
 -}
 filter : (a -> Bool) -> Deque a -> Deque a
-filter p (Deque deque) =
-    let
-        newFront =
-            List.filter p deque.front
-
-        newRear =
-            List.filter p deque.rear
-    in
-        { deque
-            | sizeF = List.length newFront
-            , front = newFront
-            , sizeR = List.length newRear
-            , rear = newRear
-        }
-            |> Deque
-            |> rebalance
+filter p =
+    mapAbstract (Internal.filter p)
 
 
 {-| Fold over the deque from left to right (highest priority to lowest priority).
 -}
 foldl : (a -> b -> b) -> b -> Deque a -> b
-foldl f initial (Deque deque) =
-    List.foldl f initial deque.front
-        |> (\initial_ -> List.foldr f initial_ deque.rear)
+foldl f initial =
+    Internal.foldl f initial << unwrap
 
 
 {-| Fold over the deque from right to left (lowest priority to highest priority).
 -}
 foldr : (a -> b -> b) -> b -> Deque a -> b
-foldr f initial (Deque deque) =
-    List.foldl f initial deque.rear
-        |> (\initial_ -> List.foldr f initial_ deque.front)
+foldr f initial =
+    Internal.foldr f initial << unwrap
 
 
 {-| Partition a deque according to a predicate. The first deque contains
@@ -368,25 +275,15 @@ partition p (Deque deque) =
 {-| Extract the first element of a deque
 -}
 first : Deque a -> Maybe a
-first (Deque deque) =
-    case ( deque.front, deque.rear ) of
-        ( [], [ x ] ) ->
-            Just x
-
-        _ ->
-            List.head deque.front
+first =
+    Internal.first << unwrap
 
 
 {-| Extract the last element of a deque.
 -}
 last : Deque a -> Maybe a
-last (Deque deque) =
-    case ( deque.front, deque.rear ) of
-        ( [ x ], [] ) ->
-            Just x
-
-        _ ->
-            List.head deque.rear
+last =
+    Internal.last << unwrap
 
 
 {-| Take the first `n` members of a deque.
@@ -396,8 +293,8 @@ last (Deque deque) =
         -- == [ 2, 3, 4 ]
 -}
 takeFront : Int -> Deque a -> List a
-takeFront i (Deque deque) =
-    List.take i deque.front ++ List.take (i - deque.sizeF) (List.reverse deque.rear)
+takeFront i =
+    Internal.takeFront i << unwrap
 
 
 {-| Take the last `n` members of a deque.
@@ -407,78 +304,19 @@ takeFront i (Deque deque) =
         -- == [ 10, 9, 8 ]
 -}
 takeBack : Int -> Deque a -> List a
-takeBack i (Deque deque) =
-    List.take i deque.rear ++ List.take (i - deque.sizeR) (List.reverse deque.front)
-
-
-{-| Rebalance the deque. This is an internal function and should not normally be
-called from the outside.
--}
-rebalance : Deque a -> Deque a
-rebalance (Deque ({ sizeF, sizeR, front, rear } as deque)) =
-    let
-        -- the maximum number of times that one half
-        -- of the deque may be longer than the other
-        balanceConstant : Int
-        balanceConstant =
-            4
-
-        size1 =
-            (sizeF + sizeR) // 2
-
-        size2 =
-            (sizeF + sizeR) - size1
-    in
-        if sizeF + sizeR < 2 then
-            Deque deque
-        else if sizeF > balanceConstant * sizeR + 1 then
-            let
-                newFront =
-                    List.take size1 front
-
-                newRear =
-                    rear ++ List.reverse (List.drop size1 front)
-            in
-                Deque
-                    { deque
-                        | sizeF = size1
-                        , front = newFront
-                        , rear = newRear
-                        , sizeR = size2
-                    }
-        else if sizeR > balanceConstant * sizeF + 1 then
-            let
-                newFront =
-                    front ++ List.reverse (List.drop size1 rear)
-
-                newRear =
-                    List.take size1 rear
-            in
-                Deque
-                    { deque
-                        | sizeF = size1
-                        , front = newFront
-                        , rear = newRear
-                        , sizeR = size2
-                    }
-        else
-            Deque deque
+takeBack i =
+    Internal.takeBack i << unwrap
 
 
 {-| Convert a deque to a list.
 -}
 toList : Deque a -> List a
-toList (Deque deque) =
-    deque.front ++ List.reverse deque.rear
+toList =
+    Internal.toList << unwrap
 
 
 {-| Create a deque from a list.
 -}
 fromList : List a -> Deque a
-fromList list =
-    let
-        (Deque e) =
-            empty
-    in
-        Deque { e | sizeF = List.length list, front = list }
-            |> rebalance
+fromList =
+    Deque << Internal.fromList emptyAbstract
