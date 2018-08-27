@@ -1,39 +1,18 @@
-module BoundedDeque
-    exposing
-        ( BoundedDeque
-        , empty
-        , singleton
-        , pushFront
-        , pushBack
-          --
-        , getMaxSize
-        , resize
-          --
-        , isEmpty
-        , member
-        , length
-        , first
-        , last
-        , popFront
-        , popBack
-        , takeFront
-        , takeBack
-        , append
-          --
-        , map
-        , filter
-        , foldl
-        , foldr
-        , partition
-          --
-        , map2
-        , andMap
-          --
-        , fromList
-        , toList
-        , fromDeque
-        , toDeque
-        )
+module BoundedDeque exposing
+    ( BoundedDeque
+    , empty, singleton, pushFront, pushBack, append
+    , fromList, toList
+    , fromDeque, toDeque
+    , getMaxSize, resize
+    , isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
+    , map, filter, foldl, foldr, partition
+    , map2, andMap
+    --
+    --
+    --
+    --
+    --
+    )
 
 {-| A limited-size deque (double-ended queue).
 
@@ -41,27 +20,35 @@ A deque is a data type for which elements can be efficiently added or removed fr
 In this limited-size variant, when the deque is full, an insertion on the front will drop an element at the back, and vice versa.
 
 #Type
+
 @docs BoundedDeque
 
 #Build
+
 @docs empty, singleton, pushFront, pushBack, append
 
 #Lists
+
 @docs fromList, toList
 
 #Deques
+
 @docs fromDeque, toDeque
 
 #Bound
+
 @docs getMaxSize, resize
 
 #Query
+
 @docs isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
 
 #Transform
+
 @docs map, filter, foldl, foldr, partition
 
 #Composition
+
 @docs map2, andMap
 
 -}
@@ -77,53 +64,44 @@ and the front) and should not be used.
 
 -}
 type BoundedDeque a
-    = BoundedDeque (Internal.AbstractDeque { maxSize : Int } a)
-
-
-mapAbstract : (Internal.AbstractDeque { maxSize : Int } a -> Internal.AbstractDeque { maxSize : Int } b) -> BoundedDeque a -> BoundedDeque b
-mapAbstract f (BoundedDeque abstract) =
-    BoundedDeque (f abstract)
-
-
-unwrap : BoundedDeque a -> Internal.AbstractDeque { maxSize : Int } a
-unwrap (BoundedDeque boundedDeque) =
-    boundedDeque
+    = BoundedDeque (Internal.Deque a) Int
 
 
 {-| Create a bounded deque from an unbounded one. If there is insufficient space, elements are dropped from the back.
 -}
 fromDeque : Int -> Internal.Deque a -> BoundedDeque a
-fromDeque maxSize (Internal.Deque ({ front, rear, sizeF, sizeR } as deque)) =
+fromDeque maxSize ({ front, rear, sizeF, sizeR } as deque) =
     let
         delta =
             maxSize - (sizeF + sizeR)
     in
-        if delta < 0 then
-            -- delta is negative
-            Internal.toList deque
-                |> fromList maxSize
-        else
-            BoundedDeque <|
+    if delta < 0 then
+        Internal.toList deque
+            |> fromList maxSize
+
+    else
+        let
+            newDeque =
                 Internal.rebalance
                     { front = front
                     , rear = rear
                     , sizeF = sizeF
                     , sizeR = sizeR
-                    , maxSize = maxSize
                     }
+        in
+        BoundedDeque newDeque maxSize
 
 
 {-| Convert a bounded deque to a normal deque.
 -}
 toDeque : BoundedDeque a -> Internal.Deque a
-toDeque (BoundedDeque { front, rear, sizeF, sizeR }) =
-    Internal.Deque <|
-        Internal.rebalance
-            { front = front
-            , rear = rear
-            , sizeF = sizeF
-            , sizeR = sizeR
-            }
+toDeque (BoundedDeque { front, rear, sizeF, sizeR } _) =
+    Internal.rebalance
+        { front = front
+        , rear = rear
+        , sizeF = sizeF
+        , sizeR = sizeR
+        }
 
 
 
@@ -134,17 +112,7 @@ toDeque (BoundedDeque { front, rear, sizeF, sizeR }) =
 -}
 empty : Int -> BoundedDeque a
 empty size =
-    BoundedDeque (emptyAbstract size)
-
-
-emptyAbstract : Int -> { front : List b, maxSize : Int, rear : List c, sizeF : number, sizeR : number1 }
-emptyAbstract maxSize =
-    { sizeF = 0
-    , front = []
-    , sizeR = 0
-    , rear = []
-    , maxSize = maxSize
-    }
+    BoundedDeque Internal.empty size
 
 
 {-| Create a deque with one element.
@@ -164,26 +132,28 @@ This function is written in pipeline style, so
 
 is the same as
 
-    (BoundedDeque.toList firstBoundedDeque)
+    BoundedDeque.toList firstBoundedDeque
         |> List.append (BoundedDeque.toList secondBoundedDeque)
 
-
 The `maxSize` is set to the sum of the two sizes.
+
 -}
 append : BoundedDeque a -> BoundedDeque a -> BoundedDeque a
-append ((BoundedDeque x) as p) ((BoundedDeque y) as q) =
-    if isEmpty p then
-        BoundedDeque { y | maxSize = (+) x.maxSize y.maxSize }
-    else if isEmpty q then
-        BoundedDeque { x | maxSize = (+) x.maxSize y.maxSize }
+append (BoundedDeque dequeX maxSizeX) (BoundedDeque dequeY maxSizeY) =
+    if Internal.isEmpty dequeX then
+        BoundedDeque dequeY (maxSizeX + maxSizeY)
+
+    else if Internal.isEmpty dequeY then
+        BoundedDeque dequeX (maxSizeX + maxSizeY)
+
     else
         BoundedDeque
-            { sizeF = x.sizeF + x.sizeR
-            , front = x.front ++ List.reverse x.rear
-            , sizeR = y.sizeF + y.sizeR
-            , rear = List.reverse (y.front ++ List.reverse y.rear)
-            , maxSize = (+) x.maxSize y.maxSize
+            { sizeF = dequeX.sizeF + dequeX.sizeR
+            , front = dequeX.front ++ List.reverse dequeX.rear
+            , sizeR = dequeY.sizeF + dequeY.sizeR
+            , rear = List.reverse (dequeY.front ++ List.reverse dequeY.rear)
             }
+            (maxSizeX + maxSizeY)
 
 
 {-| Sets a bound to the number of elements the deque can hold.
@@ -205,125 +175,133 @@ If the deque is larger than the bound, items are dropped from the back.
 
 -}
 resize : (Int -> Int) -> BoundedDeque a -> BoundedDeque a
-resize calculateMaxSize (BoundedDeque deque) =
+resize calculateMaxSize (BoundedDeque deque maxSize) =
     let
         newMaxSize =
-            calculateMaxSize deque.maxSize
+            calculateMaxSize maxSize
     in
-        if deque.sizeF + deque.sizeR <= newMaxSize then
-            BoundedDeque { deque | maxSize = newMaxSize }
-        else
-            toList (BoundedDeque deque)
-                |> fromList newMaxSize
+    if deque.sizeF + deque.sizeR <= newMaxSize then
+        BoundedDeque deque newMaxSize
+
+    else
+        Internal.toList deque
+            |> fromList newMaxSize
 
 
 {-| Get the maximum number of elements this deque can hold.
 -}
 getMaxSize : BoundedDeque a -> Int
-getMaxSize =
-    .maxSize << unwrap
+getMaxSize (BoundedDeque _ maxSize) =
+    maxSize
 
 
 reachedMaxSize : BoundedDeque a -> Bool
-reachedMaxSize (BoundedDeque { sizeF, sizeR, maxSize }) =
+reachedMaxSize (BoundedDeque { sizeF, sizeR } maxSize) =
     sizeF + sizeR == maxSize
 
 
 {-| Add an element to the front of the deque.
 
 If the deque has reached its maximum capacity, an item is dropped at the back.
+
 -}
 pushFront : a -> BoundedDeque a -> BoundedDeque a
-pushFront elem ((BoundedDeque { maxSize }) as deque) =
+pushFront elem ((BoundedDeque _ maxSize) as deque) =
     if maxSize == 0 then
         deque
+
     else
         let
-            (BoundedDeque newBoundedDeque) =
+            (BoundedDeque newDeque newMaxSize) =
                 if reachedMaxSize deque then
                     Tuple.second (popBack deque)
+
                 else
                     deque
+
+            newerDeque =
+                { newDeque
+                    | sizeF = newDeque.sizeF + 1
+                    , front = elem :: newDeque.front
+                }
         in
-            { newBoundedDeque
-                | sizeF = newBoundedDeque.sizeF + 1
-                , front = elem :: newBoundedDeque.front
-            }
-                |> BoundedDeque
-                |> mapAbstract Internal.rebalance
+        BoundedDeque (Internal.rebalance newerDeque) newMaxSize
 
 
 {-| Add an element to the back of the deque.
 
 If the deque has reached its maximum capacity, an item is dropped at the front.
+
 -}
 pushBack : a -> BoundedDeque a -> BoundedDeque a
-pushBack elem ((BoundedDeque { maxSize }) as deque) =
+pushBack elem ((BoundedDeque _ maxSize) as deque) =
     if maxSize == 0 then
         deque
+
     else
         let
-            (BoundedDeque newBoundedDeque) =
+            (BoundedDeque newBoundedDeque _) =
                 if reachedMaxSize deque then
                     Tuple.second (popFront deque)
+
                 else
                     deque
+
+            newDeque =
+                { newBoundedDeque
+                    | sizeR = newBoundedDeque.sizeR + 1
+                    , rear = elem :: newBoundedDeque.rear
+                }
         in
-            { newBoundedDeque
-                | sizeR = newBoundedDeque.sizeR + 1
-                , rear = elem :: newBoundedDeque.rear
-            }
-                |> BoundedDeque
-                |> mapAbstract Internal.rebalance
+        BoundedDeque (Internal.rebalance newDeque) maxSize
 
 
 {-| Gives Maybe the first element, and the deque without the first element.
 If there are no elements, the empty deque is returned.
 -}
 popFront : BoundedDeque a -> ( Maybe a, BoundedDeque a )
-popFront (BoundedDeque deque) =
+popFront (BoundedDeque deque maxSize) =
     deque
-        |> Internal.popFront (emptyAbstract deque.maxSize)
-        |> Tuple.mapSecond BoundedDeque
+        |> Internal.popFront
+        |> Tuple.mapSecond (\newDeque -> BoundedDeque newDeque maxSize)
 
 
 {-| Gives Maybe the last element, and the deque without the last element.
 If there are no elements, the empty deque is returned.
 -}
 popBack : BoundedDeque a -> ( Maybe a, BoundedDeque a )
-popBack (BoundedDeque deque) =
+popBack (BoundedDeque deque maxSize) =
     deque
-        |> Internal.popBack (emptyAbstract deque.maxSize)
-        |> Tuple.mapSecond BoundedDeque
+        |> Internal.popBack
+        |> Tuple.mapSecond (\newDeque -> BoundedDeque newDeque maxSize)
 
 
 {-| Determine if a deque is empty.
 -}
 isEmpty : BoundedDeque a -> Bool
-isEmpty =
-    Internal.isEmpty << unwrap
+isEmpty (BoundedDeque deque _) =
+    Internal.isEmpty deque
 
 
 {-| Figure out whether a deque contains a value.
 -}
 member : a -> BoundedDeque a -> Bool
-member elem =
-    Internal.member elem << unwrap
+member elem (BoundedDeque deque _) =
+    Internal.member elem deque
 
 
 {-| Determine the length of a list.
 -}
 length : BoundedDeque a -> Int
-length =
-    Internal.length << unwrap
+length (BoundedDeque deque _) =
+    Internal.length deque
 
 
 {-| Apply a function to all elements in a deque.
-
 -}
 map : (a -> b) -> BoundedDeque a -> BoundedDeque b
-map f =
-    mapAbstract (Internal.map f)
+map f (BoundedDeque deque maxSize) =
+    BoundedDeque (Internal.map f deque) maxSize
 
 
 {-| Like List.map2; apply a function pairwise to two deques.
@@ -342,6 +320,7 @@ to extend to map3 and beyond:
         map f a
             |> andMap b
             |> andMap c
+
 -}
 andMap : BoundedDeque a -> BoundedDeque (a -> b) -> BoundedDeque b
 andMap =
@@ -351,29 +330,29 @@ andMap =
 {-| Keep an element when it satisfies a predicate.
 -}
 filter : (a -> Bool) -> BoundedDeque a -> BoundedDeque a
-filter p =
-    mapAbstract (Internal.filter p)
+filter p (BoundedDeque deque maxSize) =
+    BoundedDeque (Internal.filter p deque) maxSize
 
 
 {-| Fold over the deque from left to right (highest priority to lowest priority).
 -}
 foldl : (a -> b -> b) -> b -> BoundedDeque a -> b
-foldl f initial =
-    Internal.foldl f initial << unwrap
+foldl f initial (BoundedDeque deque _) =
+    Internal.foldl f initial deque
 
 
 {-| Fold over the deque from right to left (lowest priority to highest priority).
 -}
 foldr : (a -> b -> b) -> b -> BoundedDeque a -> b
-foldr f initial =
-    Internal.foldr f initial << unwrap
+foldr f initial (BoundedDeque deque _) =
+    Internal.foldr f initial deque
 
 
 {-| Partition a deque according to a predicate. The first deque contains
 all elements that satisfy the predicate, and the second contains the rest.
 -}
 partition : (a -> Bool) -> BoundedDeque a -> ( BoundedDeque a, BoundedDeque a )
-partition p (BoundedDeque deque) =
+partition p (BoundedDeque deque maxSize) =
     let
         ( l1, r1 ) =
             List.partition p deque.front
@@ -381,21 +360,21 @@ partition p (BoundedDeque deque) =
         ( l2, r2 ) =
             List.partition p deque.rear
     in
-        ( fromList deque.maxSize (l1 ++ l2), fromList deque.maxSize (r1 ++ r2) )
+    ( fromList maxSize (l1 ++ l2), fromList maxSize (r1 ++ r2) )
 
 
 {-| Extract the first element of a deque
 -}
 first : BoundedDeque a -> Maybe a
-first =
-    Internal.first << unwrap
+first (BoundedDeque deque _) =
+    Internal.first deque
 
 
 {-| Extract the last element of a deque.
 -}
 last : BoundedDeque a -> Maybe a
-last =
-    Internal.last << unwrap
+last (BoundedDeque deque _) =
+    Internal.last deque
 
 
 {-| Take the first `n` members of a deque.
@@ -403,10 +382,11 @@ last =
     BoundedDeque.fromList [2..10]
         |> BoundedDeque.takeBack 3
         -- == [ 2, 3, 4 ]
+
 -}
 takeFront : Int -> BoundedDeque a -> List a
-takeFront i =
-    Internal.takeFront i << unwrap
+takeFront i (BoundedDeque deque _) =
+    Internal.takeFront i deque
 
 
 {-| Take the last `n` members of a deque.
@@ -414,17 +394,18 @@ takeFront i =
     BoundedDeque.fromList [2..10]
         |> BoundedDeque.takeBack 3
         -- == [ 10, 9, 8 ]
+
 -}
 takeBack : Int -> BoundedDeque a -> List a
-takeBack i =
-    Internal.takeBack i << unwrap
+takeBack i (BoundedDeque deque _) =
+    Internal.takeBack i deque
 
 
 {-| Convert a deque to a list.
 -}
 toList : BoundedDeque a -> List a
-toList =
-    Internal.toList << unwrap
+toList (BoundedDeque deque _) =
+    Internal.toList deque
 
 
 {-| Create a bounded deque from a maximum size and a list.
@@ -432,5 +413,5 @@ toList =
 fromList : Int -> List a -> BoundedDeque a
 fromList maxSize elements =
     List.take maxSize elements
-        |> Internal.fromList (emptyAbstract maxSize)
-        |> BoundedDeque
+        |> Internal.fromList
+        |> (\newDeque -> BoundedDeque newDeque maxSize)

@@ -1,34 +1,15 @@
-module Deque
-    exposing
-        ( Deque
-        , empty
-        , singleton
-        , pushFront
-        , pushBack
-          --
-        , isEmpty
-        , member
-        , length
-        , first
-        , last
-        , popFront
-        , popBack
-        , takeFront
-        , takeBack
-        , append
-          --
-        , map
-        , filter
-        , foldl
-        , foldr
-        , partition
-          --
-        , map2
-        , andMap
-          --
-        , fromList
-        , toList
-        )
+module Deque exposing
+    ( Deque
+    , empty, singleton, pushFront, pushBack, append
+    , fromList, toList
+    , isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
+    , map, filter, foldl, foldr, partition
+    , map2, andMap
+    --
+    --
+    --
+    --
+    )
 
 {-| A Deque (double-ended queue) in Elm.
 
@@ -44,27 +25,32 @@ is 4 times as large as the other. This is a costly operation and therefore used 
 For a deque with a limited size, see [BoundedDeque](#BoundedDeque).
 
 #Type
+
 @docs Deque
 
 #Build
+
 @docs empty, singleton, pushFront, pushBack, append
 
 #Lists
+
 @docs fromList, toList
 
 #Query
+
 @docs isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
 
 #Transform
+
 @docs map, filter, foldl, foldr, partition
 
 #Composition
-@docs map2, andMap
 
+@docs map2, andMap
 
 -}
 
-import Internal exposing (Deque(..))
+import Internal
 import List
 
 
@@ -74,16 +60,16 @@ Deque equality with `(==)` is unreliable (equivalent deques can have a different
 and the front) and should not be used.
 
 -}
-type alias Deque a =
-    Internal.Deque a
+type Deque a
+    = Deque (Internal.Deque a)
 
 
-mapAbstract : (Internal.AbstractDeque {} a -> Internal.AbstractDeque {} b) -> Deque a -> Deque b
+mapAbstract : (Internal.Deque a -> Internal.Deque b) -> Deque a -> Deque b
 mapAbstract f (Deque abstract) =
     Deque (f abstract)
 
 
-unwrap : Deque a -> Internal.AbstractDeque {} a
+unwrap : Deque a -> Internal.Deque a
 unwrap (Deque boundedDeque) =
     boundedDeque
 
@@ -96,16 +82,7 @@ unwrap (Deque boundedDeque) =
 -}
 empty : Deque a
 empty =
-    Deque emptyAbstract
-
-
-emptyAbstract : { front : List b, rear : List c, sizeF : number, sizeR : number1 }
-emptyAbstract =
-    { sizeF = 0
-    , front = []
-    , sizeR = 0
-    , rear = []
-    }
+    Deque Internal.empty
 
 
 {-| Create a deque with one element.
@@ -125,17 +102,18 @@ This function is written in pipeline style, so
 
 is the same as
 
-    (Deque.toList firstDeque)
+    Deque.toList firstDeque
         |> List.append (Deque.toList secondDeque)
-
 
 -}
 append : Deque a -> Deque a -> Deque a
 append ((Deque x) as p) ((Deque y) as q) =
     if isEmpty p then
         q
+
     else if isEmpty q then
         p
+
     else
         Deque
             { sizeF = x.sizeF + x.sizeR
@@ -174,7 +152,7 @@ If there are no elements, the empty deque is returned.
 -}
 popFront : Deque a -> ( Maybe a, Deque a )
 popFront =
-    Tuple.mapSecond Deque << Internal.popFront emptyAbstract << unwrap
+    Tuple.mapSecond Deque << Internal.popFront << unwrap
 
 
 {-| Gives Maybe the last element, and the deque without the last element.
@@ -182,7 +160,7 @@ If there are no elements, the empty deque is returned.
 -}
 popBack : Deque a -> ( Maybe a, Deque a )
 popBack =
-    Tuple.mapSecond Deque << Internal.popBack emptyAbstract << unwrap
+    Tuple.mapSecond Deque << Internal.popBack << unwrap
 
 
 {-| Determine if a deque is empty.
@@ -207,7 +185,6 @@ length =
 
 
 {-| Apply a function to all elements in a deque.
-
 -}
 map : (a -> b) -> Deque a -> Deque b
 map f =
@@ -230,6 +207,7 @@ to extend to map3 and beyond:
         map f a
             |> andMap b
             |> andMap c
+
 -}
 andMap : Deque a -> Deque (a -> b) -> Deque b
 andMap =
@@ -269,7 +247,7 @@ partition p (Deque deque) =
         ( l2, r2 ) =
             List.partition p deque.rear
     in
-        ( fromList (l1 ++ l2), fromList (r1 ++ r2) )
+    ( fromList (l1 ++ l2), fromList (r1 ++ r2) )
 
 
 {-| Extract the first element of a deque
@@ -291,6 +269,7 @@ last =
     Deque.fromList [2..10]
         |> Deque.takeBack 3
         -- == [ 2, 3, 4 ]
+
 -}
 takeFront : Int -> Deque a -> List a
 takeFront i =
@@ -302,6 +281,7 @@ takeFront i =
     Deque.fromList [2..10]
         |> Deque.takeBack 3
         -- == [ 10, 9, 8 ]
+
 -}
 takeBack : Int -> Deque a -> List a
 takeBack i =
@@ -319,4 +299,4 @@ toList =
 -}
 fromList : List a -> Deque a
 fromList =
-    Deque << Internal.fromList emptyAbstract
+    Deque << Internal.fromList

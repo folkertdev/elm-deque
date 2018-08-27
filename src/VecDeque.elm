@@ -1,4 +1,4 @@
-module VecDeque exposing (..)
+module VecDeque exposing (VecDeque(..), back, clear, count, empty, front, getWrapped, isEmpty, isFull, length, popBack, popFront, vecDeque, wrapAdd, wrapSub)
 
 import Array exposing (..)
 import Bitwise exposing (and)
@@ -8,13 +8,16 @@ type VecDeque a
     = VecDeque
         { tail :
             Int
-            -- first element that could be read
+
+        -- first element that could be read
         , head :
             Int
-            -- where data should be written
+
+        -- where data should be written
         , buf :
             Array a
-            -- buffer
+
+        -- buffer
         }
 
 
@@ -38,15 +41,15 @@ isEmpty deque =
 
 isFull : VecDeque a -> Bool
 isFull (VecDeque deque) =
-    (Array.length deque.buf) - (length (VecDeque deque)) == 1
+    Array.length deque.buf - length (VecDeque deque) == 1
 
 
 {-| Get the element at a specified index, with the index wrapped
-around the current capacity (i.e. maxcap  becomes 0, -1 becomes maxcap - 1
+around the current capacity (i.e. maxcap becomes 0, -1 becomes maxcap - 1
 -}
 getWrapped : Int -> Array a -> Int
 getWrapped index array =
-    index % (Array.length array)
+    modBy (Array.length array) index
 
 
 wrapAdd : Int -> Int -> Array a -> Int
@@ -85,7 +88,7 @@ back (VecDeque deque) =
         size =
             length (VecDeque deque)
     in
-        Array.get (size - 1) deque.buf
+    Array.get (size - 1) deque.buf
 
 
 popFront : VecDeque a -> Maybe ( a, VecDeque a )
@@ -100,7 +103,7 @@ popFront (VecDeque deque) =
         newDeque =
             vecDeque tail deque.head deque.buf
     in
-        Maybe.map (\e -> ( e, newDeque )) elem
+    Maybe.map (\e -> ( e, newDeque )) elem
 
 
 popBack : VecDeque a -> Maybe ( a, VecDeque a )
@@ -115,4 +118,4 @@ popBack (VecDeque deque) =
         newDeque =
             vecDeque deque.tail head deque.buf
     in
-        Maybe.map (\e -> ( e, newDeque )) elem
+    Maybe.map (\e -> ( e, newDeque )) elem

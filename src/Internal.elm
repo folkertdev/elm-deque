@@ -1,4 +1,4 @@
-module Internal exposing (..)
+module Internal exposing (Deque, empty, filter, first, foldl, foldr, fromList, isEmpty, last, length, map, member, popBack, popFront, rebalance, takeBack, takeFront, toList)
 
 {-| The deque datatype
 
@@ -8,22 +8,26 @@ and the front) and should not be used.
 -}
 
 
-type alias AbstractDeque record a =
-    { record
-        | sizeF : Int
-        , front : List a
-        , sizeR : Int
-        , rear : List a
+type alias Deque a =
+    { sizeF : Int
+    , front : List a
+    , sizeR : Int
+    , rear : List a
     }
 
 
-type Deque a
-    = Deque (AbstractDeque {} a)
+empty : Deque a
+empty =
+    { sizeF = 0
+    , front = []
+    , sizeR = 0
+    , rear = []
+    }
 
 
 {-| Extract the first element of a deque
 -}
-first : AbstractDeque record a -> Maybe a
+first : Deque a -> Maybe a
 first deque =
     case ( deque.front, deque.rear ) of
         ( [], [ x ] ) ->
@@ -35,7 +39,7 @@ first deque =
 
 {-| Extract the last element of a deque.
 -}
-last : AbstractDeque record a -> Maybe a
+last : Deque a -> Maybe a
 last deque =
     case ( deque.front, deque.rear ) of
         ( [ x ], [] ) ->
@@ -48,8 +52,8 @@ last deque =
 {-| Gives Maybe the first element, and the deque without the first element.
 If there are no elements, the empty deque is returned.
 -}
-popFront : AbstractDeque record a -> AbstractDeque record a -> ( Maybe a, AbstractDeque record a )
-popFront empty ({ front, rear } as deque) =
+popFront : Deque a -> ( Maybe a, Deque a )
+popFront ({ front, rear } as deque) =
     case ( front, rear ) of
         ( [], [] ) ->
             ( Nothing, empty )
@@ -58,7 +62,8 @@ popFront empty ({ front, rear } as deque) =
             ( Just x, empty )
 
         ( [], _ ) ->
-            Debug.crash "AbstractDeque record is too far unbalanced"
+            -- Debug.crash "Deque is too far unbalanced"
+            ( Nothing, empty )
 
         ( f :: fs, _ ) ->
             ( Just f
@@ -70,8 +75,8 @@ popFront empty ({ front, rear } as deque) =
 {-| Gives Maybe the last element, and the deque without the last element.
 If there are no elements, the empty deque is returned.
 -}
-popBack : AbstractDeque record a -> AbstractDeque record a -> ( Maybe a, AbstractDeque record a )
-popBack empty ({ front, rear } as deque) =
+popBack : Deque a -> ( Maybe a, Deque a )
+popBack ({ front, rear } as deque) =
     case ( front, rear ) of
         ( [], [] ) ->
             ( Nothing, empty )
@@ -80,7 +85,8 @@ popBack empty ({ front, rear } as deque) =
             ( Just x, empty )
 
         ( _, [] ) ->
-            Debug.crash "AbstractDeque record is too far unbalanced"
+            -- Debug.crash "Deque is too far unbalanced"
+            ( Nothing, empty )
 
         ( _, r :: rs ) ->
             ( Just r
@@ -94,8 +100,9 @@ popBack empty ({ front, rear } as deque) =
     AbstractDeque record.fromList [2..10]
         |> AbstractDeque record.takeBack 3
         -- == [ 2, 3, 4 ]
+
 -}
-takeFront : Int -> AbstractDeque record a -> List a
+takeFront : Int -> Deque a -> List a
 takeFront i deque =
     List.take i deque.front ++ List.take (i - deque.sizeF) (List.reverse deque.rear)
 
@@ -105,47 +112,48 @@ takeFront i deque =
     AbstractDeque record.fromList [2..10]
         |> AbstractDeque record.takeBack 3
         -- == [ 10, 9, 8 ]
+
 -}
-takeBack : Int -> AbstractDeque record a -> List a
+takeBack : Int -> Deque a -> List a
 takeBack i deque =
     List.take i deque.rear ++ List.take (i - deque.sizeR) (List.reverse deque.front)
 
 
 {-| Determine if a deque is empty.
 -}
-isEmpty : AbstractDeque record a -> Bool
+isEmpty : Deque a -> Bool
 isEmpty deque =
     length deque == 0
 
 
 {-| Figure out whether a deque contains a value.
 -}
-member : a -> AbstractDeque record a -> Bool
+member : a -> Deque a -> Bool
 member elem deque =
     List.member elem deque.front || List.member elem deque.rear
 
 
 {-| Determine the length of a list.
 -}
-length : AbstractDeque record a -> Int
+length : Deque a -> Int
 length deque =
     deque.sizeF + deque.sizeR
 
 
 {-| Apply a function to all elements in a deque.
-
 -}
-map : (a -> b) -> AbstractDeque record a -> AbstractDeque record b
+map : (a -> b) -> Deque a -> Deque b
 map f deque =
-    { deque
-        | front = List.map f deque.front
-        , rear = List.map f deque.rear
+    { front = List.map f deque.front
+    , rear = List.map f deque.rear
+    , sizeF = deque.sizeF
+    , sizeR = deque.sizeR
     }
 
 
 {-| Keep an element when it satisfies a predicate.
 -}
-filter : (a -> Bool) -> AbstractDeque record a -> AbstractDeque record a
+filter : (a -> Bool) -> Deque a -> Deque a
 filter p deque =
     let
         newFront =
@@ -154,18 +162,18 @@ filter p deque =
         newRear =
             List.filter p deque.rear
     in
-        { deque
-            | sizeF = List.length newFront
-            , front = newFront
-            , sizeR = List.length newRear
-            , rear = newRear
-        }
-            |> rebalance
+    { deque
+        | sizeF = List.length newFront
+        , front = newFront
+        , sizeR = List.length newRear
+        , rear = newRear
+    }
+        |> rebalance
 
 
 {-| Fold over the deque from left to right (highest priority to lowest priority).
 -}
-foldl : (a -> b -> b) -> b -> AbstractDeque record a -> b
+foldl : (a -> b -> b) -> b -> Deque a -> b
 foldl f initial deque =
     List.foldl f initial deque.front
         |> (\initial_ -> List.foldr f initial_ deque.rear)
@@ -173,7 +181,7 @@ foldl f initial deque =
 
 {-| Fold over the deque from right to left (lowest priority to highest priority).
 -}
-foldr : (a -> b -> b) -> b -> AbstractDeque record a -> b
+foldr : (a -> b -> b) -> b -> Deque a -> b
 foldr f initial deque =
     List.foldl f initial deque.rear
         |> (\initial_ -> List.foldr f initial_ deque.front)
@@ -181,15 +189,15 @@ foldr f initial deque =
 
 {-| Convert a deque to a list.
 -}
-toList : AbstractDeque record a -> List a
+toList : Deque a -> List a
 toList deque =
     deque.front ++ List.reverse deque.rear
 
 
 {-| Create a deque from a list.
 -}
-fromList : AbstractDeque record a -> List a -> AbstractDeque record a
-fromList empty list =
+fromList : List a -> Deque a
+fromList list =
     { empty | sizeF = List.length list, front = list }
         |> rebalance
 
@@ -197,7 +205,7 @@ fromList empty list =
 {-| Rebalance the deque. This is an internal function and should not normally be
 called from the outside.
 -}
-rebalance : AbstractDeque record a -> AbstractDeque record a
+rebalance : Deque a -> Deque a
 rebalance ({ sizeF, sizeR, front, rear } as deque) =
     let
         -- the maximum number of times that one half
@@ -212,35 +220,38 @@ rebalance ({ sizeF, sizeR, front, rear } as deque) =
         size2 =
             (sizeF + sizeR) - size1
     in
-        if sizeF + sizeR < 2 then
-            deque
-        else if sizeF > balanceConstant * sizeR + 1 then
-            let
-                newFront =
-                    List.take size1 front
+    if sizeF + sizeR < 2 then
+        deque
 
-                newRear =
-                    rear ++ List.reverse (List.drop size1 front)
-            in
-                { deque
-                    | sizeF = size1
-                    , front = newFront
-                    , rear = newRear
-                    , sizeR = size2
-                }
-        else if sizeR > balanceConstant * sizeF + 1 then
-            let
-                newFront =
-                    front ++ List.reverse (List.drop size1 rear)
+    else if sizeF > balanceConstant * sizeR + 1 then
+        let
+            newFront =
+                List.take size1 front
 
-                newRear =
-                    List.take size1 rear
-            in
-                { deque
-                    | sizeF = size1
-                    , front = newFront
-                    , rear = newRear
-                    , sizeR = size2
-                }
-        else
-            deque
+            newRear =
+                rear ++ List.reverse (List.drop size1 front)
+        in
+        { deque
+            | sizeF = size1
+            , front = newFront
+            , rear = newRear
+            , sizeR = size2
+        }
+
+    else if sizeR > balanceConstant * sizeF + 1 then
+        let
+            newFront =
+                front ++ List.reverse (List.drop size1 rear)
+
+            newRear =
+                List.take size1 rear
+        in
+        { deque
+            | sizeF = size1
+            , front = newFront
+            , rear = newRear
+            , sizeR = size2
+        }
+
+    else
+        deque
