@@ -1,14 +1,14 @@
-module TestBoundedDeque exposing (..)
+module TestBoundedDeque exposing (append, boundedDequeFuzzer, construction, folds, lists, respectsMaxSize, transforms)
 
-import Test exposing (..)
+import BoundedDeque as Deque exposing (BoundedDeque, fromList, pushBack, pushFront, toList)
 import Expect
-import Fuzz exposing (list, int, tuple, string, unit)
-import BoundedDeque as Deque exposing (BoundedDeque, fromList, toList, pushFront, pushBack)
+import Fuzz exposing (int, list, string, tuple, unit)
+import Test exposing (..)
 import Tuple exposing (second)
 
 
-deque : Fuzz.Fuzzer a -> Fuzz.Fuzzer (BoundedDeque a)
-deque a =
+boundedDequeFuzzer : Fuzz.Fuzzer a -> Fuzz.Fuzzer (BoundedDeque a)
+boundedDequeFuzzer a =
     list a
         |> Fuzz.map (\elements -> Deque.fromList (List.length elements) elements)
 
@@ -19,38 +19,38 @@ transforms a =
         absint =
             Fuzz.map abs Fuzz.int
     in
-        [ ( 1, Fuzz.map (\newSize -> Deque.resize (\_ -> newSize)) absint )
-        , ( 1, Fuzz.map pushFront a )
-        , ( 1, Fuzz.map pushBack a )
-        , ( 1, Fuzz.map (\newSize -> Deque.toList >> Deque.fromList newSize) absint )
-        , ( 1, Fuzz.map (\newSize -> Deque.toDeque >> Deque.fromDeque newSize) absint )
-        , ( 1, Fuzz.map Deque.append (deque a) )
-        ]
-            |> Fuzz.frequency
+    [ ( 1, Fuzz.map (\newSize -> Deque.resize (\_ -> newSize)) absint )
+    , ( 1, Fuzz.map pushFront a )
+    , ( 1, Fuzz.map pushBack a )
+    , ( 1, Fuzz.map (\newSize -> Deque.toList >> Deque.fromList newSize) absint )
+    , ( 1, Fuzz.map (\newSize -> Deque.toDeque >> Deque.fromDeque newSize) absint )
+    , ( 1, Fuzz.map Deque.append (boundedDequeFuzzer a) )
+    ]
+        |> Fuzz.frequency
 
 
 respectsMaxSize : Test
 respectsMaxSize =
-    fuzz (tuple ( deque unit, Fuzz.map (List.take 10) (list (transforms unit)) )) "transforms respect that length <= maxSize" <|
-        \( elements, transforms ) ->
+    fuzz (tuple ( boundedDequeFuzzer unit, Fuzz.map (List.take 10) (list (transforms unit)) )) "transforms respect that length <= maxSize" <|
+        \( elements, transforms_ ) ->
             let
                 transformed =
-                    (List.foldl (<<) identity transforms) elements
+                    List.foldl (<<) identity transforms_ elements
             in
-                Deque.length transformed
-                    |> Expect.atMost (Deque.getMaxSize transformed)
+            Deque.length transformed
+                |> Expect.atMost (Deque.getMaxSize transformed)
 
 
 construction : Test
 construction =
     describe "Construction"
-        [ fuzz (deque int) "non-full deque: push << pop == identity; front" <|
+        [ fuzz (boundedDequeFuzzer int) "non-full deque: push << pop == identity; front" <|
             \ints ->
                 ints
                     |> Deque.resize (\size -> size + 1)
                     |> (Deque.pushFront 1 >> Deque.popFront >> second >> toList)
                     |> Expect.equal (toList ints)
-        , fuzz (deque int) "non-full deque: push << pop == identity; back" <|
+        , fuzz (boundedDequeFuzzer int) "non-full deque: push << pop == identity; back" <|
             \ints ->
                 ints
                     |> Deque.resize (\size -> size + 1)
@@ -64,11 +64,11 @@ construction =
             \ints ->
                 (fromList (List.length ints + 1) >> pushBack 42 >> toList) ints
                     |> Expect.equal (ints ++ [ 42 ])
-        , fuzz (deque unit) "length distributes over toList" <|
+        , fuzz (boundedDequeFuzzer unit) "length distributes over toList" <|
             \deque ->
                 Deque.length deque
                     |> Expect.equal (List.length (Deque.toList deque))
-        , fuzz (tuple ( deque unit, unit )) "pushFront on a full deque leaves the length unchanged" <|
+        , fuzz (tuple ( boundedDequeFuzzer unit, unit )) "pushFront on a full boundedDequeFuzzer leaves the length unchanged" <|
             \( deque, element ) ->
                 let
                     given =
@@ -79,9 +79,9 @@ construction =
                     expected =
                         Deque.length deque
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque unit, unit )) "pushFront on a non-full deque increases the length by 1" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer unit, unit )) "pushFront on a non-full boundedDequeFuzzer increases the length by 1" <|
             \( deque, element ) ->
                 let
                     given =
@@ -93,9 +93,9 @@ construction =
                     expected =
                         1 + Deque.length deque
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque unit, unit )) "pushBack on a full deque leaves the length unchanged" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer unit, unit )) "pushBack on a full boundedDequeFuzzer leaves the length unchanged" <|
             \( deque, element ) ->
                 let
                     given =
@@ -106,9 +106,9 @@ construction =
                     expected =
                         Deque.length deque
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque unit, unit )) "pushBakc on a non-full deque increases the length by 1" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer unit, unit )) "pushBakc on a non-full boundedDequeFuzzer increases the length by 1" <|
             \( deque, element ) ->
                 let
                     given =
@@ -120,9 +120,9 @@ construction =
                     expected =
                         1 + Deque.length deque
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque int, int )) "non-full deque: last (pushBack x deque) == Just x" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer int, int )) "non-full deque: last (pushBack x deque) == Just x" <|
             \( deque, element ) ->
                 let
                     given =
@@ -134,9 +134,9 @@ construction =
                     expected =
                         Just element
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque int, int )) "non-full deque: first (pushFront x deque) == Just x" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer int, int )) "non-full deque: first (pushFront x deque) == Just x" <|
             \( deque, element ) ->
                 let
                     given =
@@ -148,15 +148,15 @@ construction =
                     expected =
                         Just element
                 in
-                    given
-                        |> Expect.equal expected
+                given
+                    |> Expect.equal expected
         ]
 
 
 append : Test
 append =
     describe "Append"
-        [ fuzz (tuple ( deque unit, deque unit )) "toList (append a b) == (toList a) ++ (toList b)" <|
+        [ fuzz (tuple ( boundedDequeFuzzer unit, boundedDequeFuzzer unit )) "toList (append a b) == (toList a) ++ (toList b)" <|
             \( firstDeque, secondDeque ) ->
                 let
                     given =
@@ -165,12 +165,12 @@ append =
                             |> Deque.toList
 
                     expected =
-                        (Deque.toList firstDeque)
+                        Deque.toList firstDeque
                             |> List.append (Deque.toList secondDeque)
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (tuple ( deque unit, deque unit )) "length distributes over append: length (append a b) == length a + length b" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (tuple ( boundedDequeFuzzer unit, boundedDequeFuzzer unit )) "length distributes over append: length (append a b) == length a + length b" <|
             \( firstDeque, secondDeque ) ->
                 let
                     given =
@@ -179,15 +179,15 @@ append =
                     expected =
                         Deque.length firstDeque + Deque.length secondDeque
                 in
-                    given
-                        |> Expect.equal expected
+                given
+                    |> Expect.equal expected
         ]
 
 
 folds : Test
 folds =
     describe "folds"
-        [ fuzz (deque string) "foldl f d == foldl f d << toList" <|
+        [ fuzz (boundedDequeFuzzer string) "foldl f d == foldl f d << toList" <|
             \strings ->
                 let
                     given =
@@ -199,9 +199,9 @@ folds =
                             |> Deque.toList
                             |> List.foldl (++) ""
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (deque string) "foldr f d == foldr f d << toList" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (boundedDequeFuzzer string) "foldr f d == foldr f d << toList" <|
             \strings ->
                 let
                     given =
@@ -213,9 +213,9 @@ folds =
                             |> Deque.toList
                             |> List.foldr (++) ""
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (deque int) "map f << toList == toList << map f" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (boundedDequeFuzzer int) "map f << toList == toList << map f" <|
             \deque ->
                 let
                     f x =
@@ -231,13 +231,13 @@ folds =
                             |> toList
                             |> List.map f
                 in
-                    given
-                        |> Expect.equal expected
-        , fuzz (deque int) "filter p << toList == toList << filter p" <|
+                given
+                    |> Expect.equal expected
+        , fuzz (boundedDequeFuzzer int) "filter p << toList == toList << filter p" <|
             \deque ->
                 let
                     p x =
-                        x % 7 == 0
+                        (x |> modBy 7) == 0
 
                     given =
                         deque
@@ -249,8 +249,8 @@ folds =
                             |> toList
                             |> List.filter p
                 in
-                    given
-                        |> Expect.equal expected
+                given
+                    |> Expect.equal expected
         ]
 
 
@@ -261,15 +261,15 @@ lists =
             \ints ->
                 toList (fromList (List.length ints) ints)
                     |> Expect.equal ints
-        , fuzz (deque unit) "toList << fromList == identity" <|
+        , fuzz (boundedDequeFuzzer unit) "toList << fromList == identity" <|
             \ints ->
                 fromList (Deque.length ints) (toList ints)
                     |> Expect.equal ints
-        , fuzz (deque unit) "toDeque << fromDeque == identity" <|
+        , fuzz (boundedDequeFuzzer unit) "toDeque << fromDeque == identity" <|
             \ints ->
                 Deque.fromDeque (Deque.length ints) (Deque.toDeque ints)
                     |> Expect.equal ints
-        , fuzz (tuple ( deque unit, Fuzz.int )) "x" <|
+        , fuzz (tuple ( boundedDequeFuzzer unit, Fuzz.int )) "x" <|
             \( elements, newSize ) ->
                 let
                     transformed =
@@ -277,6 +277,6 @@ lists =
                             |> Deque.toDeque
                             |> Deque.fromDeque (abs newSize)
                 in
-                    Deque.length transformed
-                        |> Expect.atMost (Deque.getMaxSize transformed)
+                Deque.length transformed
+                    |> Expect.atMost (Deque.getMaxSize transformed)
         ]
