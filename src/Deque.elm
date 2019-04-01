@@ -5,10 +5,6 @@ module Deque exposing
     , isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
     , map, filter, foldl, foldr, partition
     , map2, andMap
-    --
-    --
-    --
-    --
     )
 
 {-| A Deque (double-ended queue) in Elm.
@@ -24,27 +20,33 @@ is 4 times as large as the other. This is a costly operation and therefore used 
 
 For a deque with a limited size, see [BoundedDeque](#BoundedDeque).
 
-#Type
+
+## Type
 
 @docs Deque
 
-#Build
+
+## Build
 
 @docs empty, singleton, pushFront, pushBack, append
 
-#Lists
+
+## Lists
 
 @docs fromList, toList
 
-#Query
+
+## Query
 
 @docs isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
 
-#Transform
+
+## Transform
 
 @docs map, filter, foldl, foldr, partition
 
-#Composition
+
+## Composition
 
 @docs map2, andMap
 
@@ -127,9 +129,10 @@ append ((Deque x) as p) ((Deque y) as q) =
 -}
 pushFront : a -> Deque a -> Deque a
 pushFront elem (Deque deque) =
-    { deque
-        | sizeF = deque.sizeF + 1
-        , front = elem :: deque.front
+    { sizeF = deque.sizeF + 1
+    , front = elem :: deque.front
+    , sizeR = deque.sizeR
+    , rear = deque.rear
     }
         |> Deque
         |> mapAbstract Internal.rebalance
@@ -139,9 +142,10 @@ pushFront elem (Deque deque) =
 -}
 pushBack : a -> Deque a -> Deque a
 pushBack elem (Deque deque) =
-    { deque
-        | sizeR = deque.sizeR + 1
-        , rear = elem :: deque.rear
+    { sizeR = deque.sizeR + 1
+    , rear = elem :: deque.rear
+    , sizeF = deque.sizeF
+    , front = deque.front
     }
         |> Deque
         |> mapAbstract Internal.rebalance

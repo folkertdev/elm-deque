@@ -67,7 +67,7 @@ popFront ({ front, rear } as deque) =
 
         ( f :: fs, _ ) ->
             ( Just f
-            , { deque | sizeF = deque.sizeF - 1, front = fs }
+            , { sizeF = deque.sizeF - 1, front = fs, sizeR = deque.sizeR, rear = deque.rear }
                 |> rebalance
             )
 
@@ -90,7 +90,7 @@ popBack ({ front, rear } as deque) =
 
         ( _, r :: rs ) ->
             ( Just r
-            , { deque | sizeR = deque.sizeR - 1, rear = rs }
+            , { sizeR = deque.sizeR - 1, rear = rs, sizeF = deque.sizeF, front = deque.front }
                 |> rebalance
             )
 
@@ -162,11 +162,10 @@ filter p deque =
         newRear =
             List.filter p deque.rear
     in
-    { deque
-        | sizeF = List.length newFront
-        , front = newFront
-        , sizeR = List.length newRear
-        , rear = newRear
+    { sizeF = List.length newFront
+    , front = newFront
+    , sizeR = List.length newRear
+    , rear = newRear
     }
         |> rebalance
 
@@ -198,7 +197,7 @@ toList deque =
 -}
 fromList : List a -> Deque a
 fromList list =
-    { empty | sizeF = List.length list, front = list }
+    { sizeF = List.length list, front = list, sizeR = 0, rear = [] }
         |> rebalance
 
 
@@ -231,11 +230,10 @@ rebalance ({ sizeF, sizeR, front, rear } as deque) =
             newRear =
                 rear ++ List.reverse (List.drop size1 front)
         in
-        { deque
-            | sizeF = size1
-            , front = newFront
-            , rear = newRear
-            , sizeR = size2
+        { sizeF = size1
+        , front = newFront
+        , rear = newRear
+        , sizeR = size2
         }
 
     else if sizeR > balanceConstant * sizeF + 1 then
@@ -246,11 +244,10 @@ rebalance ({ sizeF, sizeR, front, rear } as deque) =
             newRear =
                 List.take size1 rear
         in
-        { deque
-            | sizeF = size1
-            , front = newFront
-            , rear = newRear
-            , sizeR = size2
+        { sizeF = size1
+        , front = newFront
+        , rear = newRear
+        , sizeR = size2
         }
 
     else

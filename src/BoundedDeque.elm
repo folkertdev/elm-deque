@@ -7,11 +7,6 @@ module BoundedDeque exposing
     , isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
     , map, filter, foldl, foldr, partition
     , map2, andMap
-    --
-    --
-    --
-    --
-    --
     )
 
 {-| A limited-size deque (double-ended queue).
@@ -19,35 +14,43 @@ module BoundedDeque exposing
 A deque is a data type for which elements can be efficiently added or removed from either the front or the back.
 In this limited-size variant, when the deque is full, an insertion on the front will drop an element at the back, and vice versa.
 
-#Type
+
+## Type
 
 @docs BoundedDeque
 
-#Build
+
+## Build
 
 @docs empty, singleton, pushFront, pushBack, append
 
-#Lists
+
+## Lists
 
 @docs fromList, toList
 
-#Deques
+
+## Deques
 
 @docs fromDeque, toDeque
 
-#Bound
+
+## Bound
 
 @docs getMaxSize, resize
 
-#Query
+
+## Query
 
 @docs isEmpty, member, length, first, last, popFront, popBack, takeFront, takeBack
 
-#Transform
+
+## Transform
 
 @docs map, filter, foldl, foldr, partition
 
-#Composition
+
+## Composition
 
 @docs map2, andMap
 
@@ -220,9 +223,10 @@ pushFront elem ((BoundedDeque _ maxSize) as deque) =
                     deque
 
             newerDeque =
-                { newDeque
-                    | sizeF = newDeque.sizeF + 1
-                    , front = elem :: newDeque.front
+                { sizeF = newDeque.sizeF + 1
+                , front = elem :: newDeque.front
+                , sizeR = newDeque.sizeR
+                , rear = newDeque.rear
                 }
         in
         BoundedDeque (Internal.rebalance newerDeque) newMaxSize
@@ -248,9 +252,10 @@ pushBack elem ((BoundedDeque _ maxSize) as deque) =
                     deque
 
             newDeque =
-                { newBoundedDeque
-                    | sizeR = newBoundedDeque.sizeR + 1
-                    , rear = elem :: newBoundedDeque.rear
+                { sizeR = newBoundedDeque.sizeR + 1
+                , rear = elem :: newBoundedDeque.rear
+                , sizeF = newBoundedDeque.sizeF
+                , front = newBoundedDeque.front
                 }
         in
         BoundedDeque (Internal.rebalance newDeque) maxSize
